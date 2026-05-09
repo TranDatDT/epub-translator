@@ -418,6 +418,28 @@ llm = LLM(
 )
 ```
 
+**Local models (Ollama / LM Studio / vLLM / llama.cpp server / ...):** any local server that exposes an OpenAI-compatible `/v1/chat/completions` endpoint works. Streaming + usage reporting are honored when the server supports them.
+
+```python
+# Ollama (default port 11434)
+llm = LLM(
+    key="ollama",                            # any non-empty placeholder; ignored by Ollama
+    url="http://localhost:11434/v1",
+    model="llama3.1:8b",
+    token_encoding="cl100k_base",
+)
+
+# LM Studio (default port 1234)
+llm = LLM(
+    key="lm-studio",                         # any non-empty placeholder
+    url="http://localhost:1234/v1",
+    model="meta-llama-3.1-8b-instruct",
+    token_encoding="cl100k_base",
+)
+```
+
+> ⚠️ The OpenAI Python SDK rejects an empty `key`. For local servers that don't authenticate, set `key` to **any non-empty string** (`"ollama"`, `"local"`, `"sk-anything"` — none of it leaves your machine). This applies to both the Python API and the `format.json` config.
+
 > When unsure whether a provider supports OpenAI compatibility, search their docs for "OpenAI compatible API" or check whether they expose a `/v1/chat/completions` route. Native protocols (Anthropic Messages API, Google `generateContent`) are NOT supported directly — use the OpenAI-compatible URL above instead.
 
 ### CLI Backends (no API key)
