@@ -1,16 +1,10 @@
-<div align=center>
-  <h1>EPUB Translator</h1>
-  <p>
-    <a href="https://github.com/oomol-lab/epub-translator/actions/workflows/merge-build.yml" target="_blank"><img src="https://img.shields.io/github/actions/workflow/status/oomol-lab/epub-translator/merge-build.yml" alt="ci" /></a>
-    <a href="https://pypi.org/project/epub-translator/" target="_blank"><img src="https://img.shields.io/badge/pip_install-epub--translator-blue" alt="pip install epub-translator" /></a>
-    <a href="https://pypi.org/project/epub-translator/" target="_blank"><img src="https://img.shields.io/pypi/v/epub-translator.svg" alt="pypi epub-translator" /></a>
-    <a href="https://pypi.org/project/epub-translator/" target="_blank"><img src="https://img.shields.io/pypi/pyversions/epub-translator.svg" alt="python versions" /></a>
-    <a href="https://github.com/oomol-lab/epub-translator/blob/main/LICENSE" target="_blank"><img src="https://img.shields.io/github/license/oomol-lab/epub-translator" alt="license" /></a>
-  </p>
-  <p><a href="https://hub.oomol.com/package/books-translator?open=true" target="_blank"><img src="https://static.oomol.com/assets/button.svg" alt="Open in OOMOL Studio" /></a></p>
-  <p>English | <a href="./README_zh-CN.md">中文</a></p>
-</div>
-
+> **Personal fork notice** — This is a personal fork of [oomol-lab/epub-translator](https://github.com/oomol-lab/epub-translator) that adds **CLI-backend support** alongside the original HTTP API backend.
+>
+> **Why a fork?** Many of us already pay for AI subscriptions (ChatGPT Plus, Claude Pro, Gemini Advanced) that include local CLI tools (`codex`, `claude`, `gemini`). Provisioning a separate, separately-billed API key just to translate a book you bought for yourself feels redundant when the same model is already available through a CLI you're authenticated to. This fork lets you route translations through whichever CLI you have on hand, while keeping the original HTTP API path fully intact.
+>
+> **Intended scope:** personal, non-commercial use — translating books you legally own for your own reading. For production workloads, automation at scale, or anything where SLAs and quotas matter, use the original HTTP API path (`kind = "openai"`) with a proper API key, and review your CLI vendor's terms of service to make sure your usage stays within their acceptable-use policies. The CLI-backend path is offered as-is, with no warranty or guarantee that it will keep working if a vendor changes their CLI behavior.
+>
+> All credit for the underlying translator engine goes to the original authors at [oomol-lab](https://github.com/oomol-lab).
 
 Want to read a book in a foreign language without losing the original context? EPUB Translator transforms any EPUB into a bilingual edition with AI-powered translations displayed side-by-side with the original text.
 
@@ -18,34 +12,98 @@ Whether you're learning a new language, conducting academic research, or simply 
 
 ![Translation Effect](./docs/images/translation.png)
 
-### Online Version
-
-If you'd like to try EPUB Translator without setting it up locally, you can use [Inkora - EPUB Translator](https://inkora.oomol.com/epub-translator), the official online app for the same bilingual EPUB translation workflow. It lets you upload an EPUB file and try the main experience directly in your browser.
-
-[![EPUB Translator Online Version](docs/images/online-en.png)](https://inkora.oomol.com/epub-translator)
-
-## Installation
-
-```bash
-pip install epub-translator
-```
-
-**Requirements**: Python 3.11, 3.12, or 3.13
-
 ## Quick Start
 
-### Using OOMOL Studio (Recommended)
+### Using the bundled script (recommended for this fork)
 
-The easiest way to use EPUB Translator is through OOMOL Studio with a visual interface:
+The fastest path for personal use: clone, configure, run.
 
-[![Watch the Tutorial](./docs/images/link2youtube.png)](https://www.youtube.com/watch?v=QsAdiskxfXI)
+**Requirements:** Python 3.11, 3.12, or 3.13.
 
-### Using Python API
+**1. Set up the project:**
+
+```bash
+git clone https://github.com/TranDatDT/epub-translator.git
+cd epub-translator
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+**2. Create `format.json` at the project root.** Pick one of these two starting points:
+
+**(a) CLI mode** — uses your local `codex` / `claude` / `gemini` subscription, no API key needed:
+
+```json
+{
+  "kind": "codex",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": "medium",
+  "token_encoding": "o200k_base",
+  "timeout": 600.0,
+  "retry_times": 3,
+  "retry_interval_seconds": 1.0,
+  "options": {
+    "submit": "replace",
+    "concurrency": 4,
+    "user_prompt": "Translate medical terminology faithfully."
+  },
+  "translation": {},
+  "fill": {}
+}
+```
+
+Make sure the matching CLI is on your `PATH` and you've signed in (`codex login`, `claude` first-run, or `gemini` first-run). See [`format.template.cli.json`](./format.template.cli.json) for a Claude/Gemini variant.
+
+**(b) HTTP API mode** — bring your own API key:
+
+```json
+{
+  "kind": "openai",
+  "key": "sk-...",
+  "url": "https://api.openai.com/v1",
+  "model": "gpt-4o",
+  "token_encoding": "o200k_base",
+  "timeout": 360.0,
+  "retry_times": 10,
+  "retry_interval_seconds": 0.75,
+  "options": {
+    "submit": "append_block",
+    "concurrency": 4
+  },
+  "translation": { "temperature": 0.8, "top_p": 0.6 },
+  "fill": { "temperature": [0.2, 0.9], "top_p": [0.9, 1.0] }
+}
+```
+
+> **If you're going to use HTTP API anyway, prefer the [upstream project](https://github.com/oomol-lab/epub-translator) directly** — it has the original maintainers, faster updates, an OOMOL Studio GUI, and a hosted online version. This fork only exists because of the CLI-backend addition; the HTTP API path here is unchanged from upstream and offers nothing extra. Works with OpenAI, Anthropic, Google, OpenRouter, etc. — see [Configuration Examples](#configuration-examples).
+
+**3. Run the script:**
+
+```bash
+python scripts/translate_epub.py path/to/book.epub -l Vietnamese
+```
+
+The translated file lands at **`temp/translated.epub`**. Logs go to `temp/logs/`. Successful segments are cached under `cache/` — if you re-run after `Ctrl+C`, finished segments are skipped, only the rest is re-translated. (The `temp/` directory is wiped on every run; `cache/` survives, so copy your output out before the next run.)
+
+#### `options` block reference
+
+The `options` block in `format.json` controls how the bundled script calls `translate(...)`:
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `submit` | `"replace"` \| `"append_block"` \| `"append_text"` | `"append_block"` | `replace` = monolingual output (target language only). `append_block` = bilingual, side-by-side. `append_text` = bilingual, inline. |
+| `concurrency` | int | `4` | How many segments to translate in parallel. Higher = faster but more rate-limit risk. |
+| `user_prompt` | string \| null | `null` | Optional extra instruction passed to the translator (e.g. "Use formal register" or "Faithfully render medical terminology"). |
+
+### Using the Python API directly
+
+If you're embedding the translator in a larger pipeline rather than using the bundled script, use the Python API:
 
 ```python
 from epub_translator import LLM, translate, language, SubmitKind
 
-# Initialize LLM with your API credentials
+# HTTP API path — provide key + url
 llm = LLM(
     key="your-api-key",
     url="https://api.openai.com/v1",
@@ -53,7 +111,9 @@ llm = LLM(
     token_encoding="o200k_base",
 )
 
-# Translate EPUB file using language constants
+# CLI path — no key needed, uses your local CLI subscription
+# llm = LLM(kind="claude", model="claude-sonnet-4-5", token_encoding="cl100k_base")
+
 translate(
     source_path="source.epub",
     target_path="translated.epub",
@@ -63,7 +123,7 @@ translate(
 )
 ```
 
-### With Progress Tracking
+#### With progress tracking
 
 ```python
 from tqdm import tqdm
@@ -95,19 +155,31 @@ Initialize the LLM client for translation:
 
 ```python
 LLM(
-    key: str,                          # API key
-    url: str,                          # API endpoint URL
     model: str,                        # Model name (e.g., "gpt-4")
     token_encoding: str,               # Token encoding (e.g., "o200k_base")
+    kind: str = "openai",              # Backend: "openai" | "codex" | "claude" | "gemini"
+    key: str = "",                     # API key (required for "openai", ignored for CLI backends)
+    url: str = "",                     # API endpoint URL (required for "openai", ignored for CLI backends)
     cache_path: PathLike | None = None,           # Cache directory path
     timeout: float | None = None,                  # Request timeout in seconds
-    top_p: float | tuple[float, float] | None = None,
-    temperature: float | tuple[float, float] | None = None,
+    top_p: float | tuple[float, float] | None = None,    # Ignored for CLI backends
+    temperature: float | tuple[float, float] | None = None,  # Ignored for CLI backends
     retry_times: int = 5,                         # Number of retries on failure
     retry_interval_seconds: float = 6.0,          # Interval between retries
     log_dir_path: PathLike | None = None,         # Log directory path
+    extra_body: dict[str, object] | None = None,  # OpenAI-only: provider-specific request body
+    reasoning_effort: str | None = None,          # Codex CLI only: "low" | "medium" | "high"
 )
 ```
+
+**Backend (`kind`):**
+
+- `"openai"` (default) — Calls an OpenAI-compatible HTTP API. Requires `key` and `url`.
+- `"codex"` — Shells out to the [Codex CLI](https://github.com/openai/codex) (`codex exec`). Requires `codex login` to be set up; no API key needed in `LLM(...)`.
+- `"claude"` — Shells out to the [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`claude -p`). Requires the CLI to be authenticated; no API key needed in `LLM(...)`.
+- `"gemini"` — Shells out to the [Gemini CLI](https://github.com/google-gemini/gemini-cli) (`gemini -p`). Requires the CLI to be authenticated; no API key needed in `LLM(...)`.
+
+CLI backends are useful when you don't want to manage API keys, or when your CLI subscription already covers your model usage. They do **not** report token usage (`total_tokens` etc. stay at `0`) and ignore `temperature`/`top_p`.
 
 ### `translate` Function
 
@@ -311,7 +383,31 @@ llm = LLM(
 
 ### Other OpenAI-Compatible Services
 
-Any service with an OpenAI-compatible API can be used:
+Any service with an OpenAI-compatible HTTP endpoint works with `kind="openai"` — including the **official APIs** of providers like Anthropic and Google, since they expose OpenAI-compatible routes alongside their native APIs.
+
+**Anthropic Claude (official):**
+
+```python
+llm = LLM(
+    key="sk-ant-...",
+    url="https://api.anthropic.com/v1/",
+    model="claude-sonnet-4-5",
+    token_encoding="cl100k_base",
+)
+```
+
+**Google Gemini (official):**
+
+```python
+llm = LLM(
+    key="AIza...",
+    url="https://generativelanguage.googleapis.com/v1beta/openai/",
+    model="gemini-2.5-pro",
+    token_encoding="cl100k_base",
+)
+```
+
+**xAI Grok / OpenRouter / Groq / DeepSeek / Together / etc.** — same pattern, just swap `url` and `model`:
 
 ```python
 llm = LLM(
@@ -321,6 +417,65 @@ llm = LLM(
     token_encoding="o200k_base",  # Match your model's encoding
 )
 ```
+
+> When unsure whether a provider supports OpenAI compatibility, search their docs for "OpenAI compatible API" or check whether they expose a `/v1/chat/completions` route. Native protocols (Anthropic Messages API, Google `generateContent`) are NOT supported directly — use the OpenAI-compatible URL above instead.
+
+### CLI Backends (no API key)
+
+When you'd rather use a vendor CLI you've already authenticated than mint a fresh API key, set `kind` to one of `"codex"`, `"claude"`, or `"gemini"`. EPUB Translator will shell out to the local binary, send the prompt over stdin/argv, and parse the response. `key` and `url` can be omitted.
+
+**Prerequisites:**
+
+| Backend | Install | Authenticate |
+|---------|---------|--------------|
+| `codex` | [openai/codex](https://github.com/openai/codex) | `codex login` |
+| `claude` | [docs.anthropic.com/claude-code](https://docs.anthropic.com/en/docs/claude-code) | `claude` (follow prompt) |
+| `gemini` | [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli) | `gemini` (follow prompt) |
+
+The binary must be on `PATH`. EPUB Translator wraps each request as a small JSON envelope (`{"translation": "..."}`) and is robust against the CLI returning markdown fences or stray preambles.
+
+**Claude Code CLI:**
+
+```python
+llm = LLM(
+    kind="claude",
+    model="claude-sonnet-4-5",      # optional; omit to use the CLI default
+    token_encoding="cl100k_base",   # still used to estimate chunk sizes
+    timeout=600.0,
+)
+```
+
+**Codex CLI:**
+
+```python
+llm = LLM(
+    kind="codex",
+    model="gpt-5",                  # optional
+    reasoning_effort="medium",      # optional: "low" | "medium" | "high"
+    token_encoding="o200k_base",
+    timeout=600.0,
+)
+```
+
+**Gemini CLI:**
+
+```python
+llm = LLM(
+    kind="gemini",
+    model="gemini-2.5-pro",         # optional
+    token_encoding="cl100k_base",
+    timeout=600.0,
+)
+```
+
+**Using with the bundled script:** see [Quick Start › Using the bundled script](#using-the-bundled-script-recommended-for-this-fork) above for the end-to-end recipe.
+
+**Caveats for CLI backends:**
+
+- No token-usage reporting — `llm.total_tokens` and friends stay at `0`. Cost tracking happens on the CLI provider's side.
+- `temperature` and `top_p` are ignored (CLIs don't expose them).
+- Each translation segment spawns a subprocess, so per-call latency is higher than HTTP. Crank up `concurrency` on `translate(...)` to compensate.
+- The CLI must be installed and authenticated on the machine running EPUB Translator. `LLM(kind="claude", ...)` raises `RuntimeError` at construction time if the binary is missing from `PATH`.
 
 ## Advanced Features
 
@@ -490,8 +645,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/oomol-lab/epub-translator/issues)
-- **Online App**: [Inkora - EPUB Translator](https://inkora.oomol.com/epub-translator)

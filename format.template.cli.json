@@ -1,0 +1,15 @@
+{
+  "kind": "claude",
+  "model": "claude-sonnet-4-5",
+  "token_encoding": "cl100k_base",
+  "timeout": 600.0,
+  "retry_times": 3,
+  "retry_interval_seconds": 1.0,
+  "options": {
+    "submit": "append_block",
+    "concurrency": 4,
+    "user_prompt": null
+  },
+  "translation": {},
+  "fill": {}
+}

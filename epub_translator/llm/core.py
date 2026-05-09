@@ -10,11 +10,14 @@ from jinja2 import Environment, Template
 from tiktoken import Encoding, get_encoding
 
 from ..template import create_env
+from .cli_executor import build_cli_executor
 from .context import LLMContext
 from .executor import LLMExecutor
 from .increasable import Increasable
 from .statistics import Statistics
 from .types import Message
+
+_CLI_KINDS = frozenset({"codex", "claude", "gemini"})
 
 # Global state for logger filename generation
 _LOGGER_LOCK = threading.Lock()
@@ -25,10 +28,11 @@ _LOGGER_SUFFIX_ID: int = 1
 class LLM:
     def __init__(
         self,
-        key: str,
-        url: str,
         model: str,
         token_encoding: str,
+        kind: str = "openai",
+        key: str = "",
+        url: str = "",
         timeout: float | None = None,
         top_p: float | tuple[float, float] | None = None,
         temperature: float | tuple[float, float] | None = None,
@@ -37,6 +41,7 @@ class LLM:
         cache_path: PathLike | str | None = None,
         log_dir_path: PathLike | str | None = None,
         extra_body: dict[str, object] | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
         prompts_path = Path(str(files("epub_translator"))) / "data"
         self._templates: dict[str, Template] = {}
@@ -47,7 +52,45 @@ class LLM:
         self._cache_path: Path | None = self._ensure_dir_path(cache_path)
         self._logger_save_path: Path | None = self._ensure_dir_path(log_dir_path)
         self._statistics = Statistics()
-        self._executor = LLMExecutor(
+        self._executor = self._build_executor(
+            kind=kind,
+            key=key,
+            url=url,
+            model=model,
+            timeout=timeout,
+            retry_times=retry_times,
+            retry_interval_seconds=retry_interval_seconds,
+            extra_body=extra_body,
+            reasoning_effort=reasoning_effort,
+        )
+
+    def _build_executor(
+        self,
+        kind: str,
+        key: str,
+        url: str,
+        model: str,
+        timeout: float | None,
+        retry_times: int,
+        retry_interval_seconds: float,
+        extra_body: dict[str, object] | None,
+        reasoning_effort: str | None,
+    ):
+        normalized = (kind or "openai").lower()
+        if normalized in _CLI_KINDS:
+            return build_cli_executor(
+                kind=normalized,
+                model=model,
+                timeout=timeout,
+                retry_times=retry_times,
+                retry_interval_seconds=retry_interval_seconds,
+                create_logger=self._create_logger,
+                statistics=self._statistics,
+                reasoning_effort=reasoning_effort,
+            )
+        if normalized != "openai":
+            raise ValueError(f"Unknown LLM kind: {kind!r}")
+        return LLMExecutor(
             url=url,
             model=model,
             api_key=key,

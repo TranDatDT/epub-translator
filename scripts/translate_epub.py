@@ -8,7 +8,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from epub_translator import FillFailedEvent, SubmitKind, translate
+from epub_translator import FillFailedEvent, translate
 from scripts.utils import load_llm, read_and_clean_temp
 
 
@@ -28,10 +28,11 @@ def main() -> None:
     target_language = args.lan
 
     temp_path = read_and_clean_temp()
-    translation_llm, fill_llm = load_llm(
+    translation_llm, fill_llm, options = load_llm(
         cache_path=Path(__file__).parent / ".." / "cache",
         log_dir_path=temp_path / "logs",
     )
+    print(f"Submit mode: {options.submit.name}, concurrency: {options.concurrency}")
     with tqdm(total=100, desc="Translating", unit="%", bar_format="{l_bar}{bar}| {n:.1f}/{total:.0f}%") as pbar:
         last_progress = 0.0
 
@@ -55,9 +56,10 @@ def main() -> None:
         translate(
             translation_llm=translation_llm,
             fill_llm=fill_llm,
-            concurrency=4,
+            concurrency=options.concurrency,
             target_language=target_language,
-            submit=SubmitKind.APPEND_BLOCK,
+            submit=options.submit,
+            user_prompt=options.user_prompt,
             source_path=source_path,
             target_path=temp_path / "translated.epub",
             on_progress=on_progress,
